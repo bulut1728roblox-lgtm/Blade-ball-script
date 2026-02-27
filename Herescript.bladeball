@@ -1,0 +1,130 @@
+-- Blade Ball Noclip + Fly + Clip İçine Gir (Çatışma İçin) - Kendim Yaptım (2026 Uyumlu)
+-- F: Noclip Toggle (içine girmek için aç)
+-- G: Fly Toggle (uçmak için)
+-- H: En Yakın Oyuncuya Clip (içine tp et + noclip kapat = çatışma!)
+-- Speed: 50 (uçma hızı)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local PhysicsService = game:GetService("PhysicsService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local root = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
+
+-- Global toggles
+getgenv().Noclip = false
+getgenv().Fly = false
+getgenv().FlySpeed = 50
+
+-- Collision Group Setup (Anti-cheat bypass için gelişmiş noclip)
+if PhysicsService:GetCollisionGroupId("noclip") == 0 then
+    PhysicsService:RegisterCollisionGroup("noclip")
+end
+PhysicsService:CollisionGroupSetCollidable("noclip", "Default", false)
+PhysicsService:CollisionGroupSetCollidable("noclip", "noclip", false)
+
+-- Fly BodyVelocity
+local bv = Instance.new("BodyVelocity")
+bv.MaxForce = Vector3.new(4000, 4000, 4000)
+bv.Velocity = Vector3.new(0, 0, 0)
+bv.Parent = root
+
+-- Noclip Update
+local function updateNoclip()
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            pcall(function()
+                if getgenv().Noclip then
+                    PhysicsService:SetPartCollisionGroup(part, "noclip")
+                else
+                    PhysicsService:SetPartCollisionGroup(part, "Default")
+                end
+            end)
+        end
+    end
+end
+
+-- Fly Update
+local function updateFly()
+    local camera = workspace.CurrentCamera
+    local moveDir = humanoid.MoveDirection
+    if getgenv().Fly then
+        local vel = camera.CFrame:VectorToWorldSpace(Vector3.new(moveDir.X, 0, moveDir.Z)) * getgenv().FlySpeed
+        vel = Vector3.new(vel.X, moveDir.Y * getgenv().FlySpeed, vel.Z)
+        bv.Velocity = vel
+    else
+        bv.Velocity = Vector3.new(0, 0, 0)
+    end
+end
+
+-- Main Loop
+RunService.Heartbeat:Connect(function()
+    pcall(updateNoclip)
+    pcall(updateFly)
+end)
+
+-- Keybinds
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.F then
+        getgenv().Noclip = not getgenv().Noclip
+        print("🛡️ Noclip:", getgenv().Noclip and "AÇIK" or "KAPALI")
+        
+    elseif input.KeyCode == Enum.KeyCode.G then
+        getgenv().Fly = not getgenv().Fly
+        print("✈️ Fly:", getgenv().Fly and "AÇIK" or "KAPALI")
+        
+    elseif input.KeyCode == Enum.KeyCode.H then
+        -- En yakın oyuncuyu bul ve içine clip et
+        local nearestPlayer, shortestDist = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player \~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (root.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    nearestPlayer = player
+                end
+            end
+        end
+        
+        if nearestPlayer then
+            getgenv().Noclip = true  -- Önce noclip aç
+            wait(0.05)
+            
+            -- İçine tp (rastgele offset ile tam ortada)
+            local targetRoot = nearestPlayer.Character.HumanoidRootPart
+            local offset = Vector3.new(
+                math.random(-2, 2)/10,
+                math.random(-2, 2)/10,
+                math.random(-2, 2)/10
+            )
+            root.CFrame = targetRoot.CFrame + offset
+            
+            wait(0.1)
+            getgenv().Noclip = false  -- Kapat = ÇATISMA! (iter onu deli gibi)
+            
+            print("💥 " .. nearestPlayer.Name .. " içine girdin! Çatışma aktif!")
+        else
+            print("❌ Yakın oyuncu yok!")
+        end
+    end
+end)
+
+-- Character Yeniden Doğma Desteği
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    root = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+    bv.Parent = root
+end)
+
+-- WalkSpeed de bonus (uçmazken hızlı git)
+humanoid.WalkSpeed = 50
+
+print("🎮 Blade Ball Clip Script AKTIF!")
+print("F: Noclip | G: Fly | H: Yakına Clip (Çatışma) | Speed: 50")
